@@ -28,8 +28,8 @@ def positive_int(value):
 def add_options(parser, suppress=False):
     def default(value):
         return argparse.SUPPRESS if suppress else value
-    parser.add_argument("--model", "-model", default=default(os.getenv("AI_MODEL") or "gpt-4.1-mini"), help="AI 모델 (AI_MODEL 또는 gpt-4.1-mini)")
-    parser.add_argument("--temperature", "-temperature", type=temperature_value, default=default(0.3), help="무작위성, 0~2 (기본 0.3)")
+    parser.add_argument("--model", "-model", default=default(os.getenv("LLM_MODEL") or os.getenv("AI_MODEL") or "gpt-4.1-mini"), help="AI 모델 (LLM_MODEL / AI_MODEL 또는 gpt-4.1-mini)")
+    parser.add_argument("--temperature", "-temperature", type=temperature_value, default=default(None), help="무작위성, 0~2 (일반 모델 기본 0.3, gpt-5-mini 생략)")
     parser.add_argument("--max-tokens", "-max-tokens", type=positive_int, default=default(1000), help="최대 출력 토큰 (기본 1000)")
     parser.add_argument("--safe-mode", "-safe-mode", action="store_true", default=default(False), help="민감정보 마스킹 및 diff 최대 10개 파일/200줄")
 
@@ -60,9 +60,9 @@ def main():
         if not diff.strip():
             print("[INFO] 분석 가능한 텍스트 diff가 없습니다. 새 파일은 git add <파일> 후 다시 실행하세요.")
             return 0
-        api_key = os.getenv("AI_API_KEY", "").strip()
+        api_key = (os.getenv("LLM_API_KEY") or os.getenv("AI_API_KEY") or "").strip()
         if not api_key:
-            raise RuntimeError('AI_API_KEY 환경변수가 설정되지 않았습니다. export AI_API_KEY="YOUR_KEY"')
+            raise RuntimeError('LLM_API_KEY 또는 AI_API_KEY 환경변수가 설정되지 않았습니다. export LLM_API_KEY="YOUR_KEY"')
         if not args.model.strip():
             raise RuntimeError("모델명을 지정하세요: --model 또는 AI_MODEL")
         print(f"[INFO] Git diff 수집 완료: {len(diff.splitlines())}줄")

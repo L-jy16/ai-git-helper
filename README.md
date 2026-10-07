@@ -15,6 +15,30 @@ python3 -m pip install -r requirements.txt
 
 다른 프로젝트에 적용하려면 해당 Git 프로젝트 루트에서 `python3 /도구의/절대경로/main.py commit`처럼 실행합니다. 하위 디렉토리나 Git 저장소 밖에서는 오류로 종료합니다.
 
+## Codyssey 환경변수 (제공된 안내 기준)
+
+프로젝트 루트의 로컬 `.env`에 `export LLM_API_KEY=...`, `LLM_BASE_URL`, `LLM_MODEL`, `LLM_TIMEOUT_SECONDS`를 설정한 후 현재 터미널로 불러옵니다. `.env`는 Git에서 제외되며 자동으로 읽지는 않습니다.
+
+```bash
+source .env
+python3 main.py commit --safe-mode --max-tokens 4000
+python3 main.py pr --safe-mode --max-tokens 4000
+```
+
+키를 제외한 설정값은 다음과 같습니다.
+
+```bash
+export LLM_BASE_URL='https://copa.codyssey.kr/v1'
+export LLM_MODEL='gpt-5-mini'
+export LLM_TIMEOUT_SECONDS=30
+```
+
+최종 요청 주소는 `https://copa.codyssey.kr/v1/chat/completions`입니다. `LLM_*`가 있으면 기존 `AI_*`보다 우선합니다. 키는 `LLM_API_KEY` 또는 `AI_API_KEY`를 사용합니다. 타임아웃은 양수 초 단위입니다. 셸에서 줄 앞에 `#`를 붙이면 주석이 되어 설정되지 않습니다.
+
+`gpt-5-mini`에는 `temperature`를 보내지 않습니다. 명시적으로 `--temperature`를 지정하면 안내 오류로 종료합니다. 일반 모델은 기존 기본값 0.3을 사용합니다. GPT-5 mini의 토큰 상한은 추론 토큰도 포함하므로 출력이 잘리면 상한을 늘리세요. 위 4000은 실행 예시이며 CLI 기본값은 1000입니다.
+
+참고: [공식 모델 파라미터 호환성 안내](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-5.2).
+
 ## API 환경변수
 
 ```bash
@@ -124,7 +148,7 @@ fix: 빈 입력에 대한 오류 처리 추가
 | 토큰 한도에 의한 출력 중단 | `--max-tokens` 증가 안내 |
 | 재생성 후 형식 오류 | 오류 안내, 완료 처리하지 않음 |
 
-요청 대기 시간은 30초입니다. 서버 응답의 원문 오류 본문은 민감정보 노출을 줄이기 위해 출력하지 않습니다.
+요청 대기 시간은 `LLM_TIMEOUT_SECONDS`로 설정하며 기본 30초입니다. 서버 응답의 원문 오류 본문은 민감정보 노출을 줄이기 위해 출력하지 않습니다.
 
 ## 안전 모드와 비용
 

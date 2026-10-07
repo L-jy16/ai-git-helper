@@ -60,6 +60,28 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(body['max_completion_tokens'], 1000)
         self.assertEqual(request.get_header('Authorization'), 'Bearer test-key')
 
+    def test_codyssey_environment(self):
+        opener = MagicMock()
+        opener.open.return_value.__enter__.return_value.read.return_value = b'{"choices":[{"message":{"content":"ok"}}]}'
+        env = {"LLM_BASE_URL": "https://copa.codyssey.kr/v1/", "LLM_MODEL": "gpt-5-mini", "LLM_TIMEOUT_SECONDS": "30"}
+        with patch.dict(os.environ, env, clear=True), patch('ai_client.urllib.request.build_opener', return_value=opener):
+            args = main.create_parser().parse_args(['commit'])
+            self.assertEqual(args.model, 'gpt-5-mini')
+            ai_client.call_ai('dummy', 'test', args.model, args.temperature, 4000)
+        request = opener.open.call_args.args[0]
+        self.assertEqual(request.full_url, 'https://copa.codyssey.kr/v1/chat/completions')
+        self.assertEqual(opener.open.call_args.kwargs['timeout'], 30)
+        body = json.loads(request.data)
+        self.assertNotIn('temperature', body)
+        self.assertEqual(body['max_completion_tokens'], 4000)
+
+    def test_invalid_codyssey_options(self):
+        for timeout in ('0', '-1', 'nan', 'bad'):
+            with patch.dict(os.environ, {'LLM_TIMEOUT_SECONDS': timeout}, clear=True), self.assertRaises(RuntimeError):
+                ai_client.call_ai('dummy', 'test', 'gpt-5-mini', None, 1000)
+        with patch.dict(os.environ, {}, clear=True), self.assertRaisesRegex(RuntimeError, 'temperature'):
+            ai_client.call_ai('dummy', 'test', 'gpt-5-mini', 0.3, 1000)
+
     def test_failures(self):
         for payload in (b'no json', b'{}', b'null', b'{"choices": []}', b'{"choices": [{"message": {"content": ""}}]}', b'{"choices": [{"finish_reason": "length"}]}'):
             with self.assertRaises(RuntimeError):
