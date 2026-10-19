@@ -1,3 +1,4 @@
+# 작성 규칙에 파일 상태와 실제 diff를 삽입하여 커밋 메시지용 입력을 만든다.
 def build_commit_prompt(status, diff):
 
     return f"""
@@ -25,6 +26,7 @@ def build_commit_prompt(status, diff):
 """.strip()
 
 
+# PR 제목·본문 양식과 브랜치·파일 상태·diff를 하나의 입력 문자열로 구성한다.
 def build_pr_prompt(branch, status, diff):
 
     return f"""

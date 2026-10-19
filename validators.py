@@ -4,6 +4,7 @@ import re
 SECTIONS = ("## Why", "## What", "## How to Test")
 
 
+# 첫 줄을 제목으로 검사하고 본문이 있으면 내용 있는 불릿을 요구한다. 빈 목록은 통과다.
 def validate_commit(text):
     lines = text.strip().splitlines()
     if not lines:
@@ -17,6 +18,7 @@ def validate_commit(text):
     return errors
 
 
+# 제목 길이와 필수 섹션의 개수·순서·불릿을 검사해 오류 설명 목록을 반환한다.
 def validate_pr(text):
     lines = [line.strip() for line in text.strip().splitlines()]
     errors = []
@@ -24,6 +26,7 @@ def validate_pr(text):
         return ["PR Title/PR Body 구분선을 각각 한 번 포함하세요."]
     title_start = lines.index("--- PR Title ---")
     body_start = lines.index("--- PR Body ---")
+    # 두 구분선 사이의 빈 줄을 제외한 내용이 정확히 한 줄인지 확인한다.
     title = [line for line in lines[title_start + 1:body_start] if line]
     if title_start != 0 or body_start <= title_start or len(title) != 1:
         errors.append("PR 제목은 비어 있지 않은 한 줄이어야 합니다.")
@@ -37,6 +40,7 @@ def validate_pr(text):
             continue
         start = body.index(section)
         positions.append(start)
+        # 다음 헤더까지만 검사하여 다른 섹션의 불릿을 잘못 인정하지 않는다.
         end = next((i for i in range(start + 1, len(body)) if body[i].startswith('#')), len(body))
         if not any(re.match(r"^[-*+]\s+\S", line) for line in body[start + 1:end]):
             errors.append(f"{section} 섹션에 내용이 있는 불릿이 필요합니다.")

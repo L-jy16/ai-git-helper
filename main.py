@@ -11,6 +11,7 @@ from safe_mode import sanitize_diff, mask_sensitive_data
 from validators import validate_commit, validate_pr
 
 
+# 문자열 옵션을 실수로 바꾸고 범위 및 NaN/무한대를 검사한다.
 def temperature_value(value):
     value = float(value)
     if not math.isfinite(value) or not 0 <= value <= 2:
@@ -18,6 +19,7 @@ def temperature_value(value):
     return value
 
 
+# 출력 토큰 상한은 0보다 큰 정수만 허용한다.
 def positive_int(value):
     value = int(value)
     if value <= 0:
@@ -25,7 +27,9 @@ def positive_int(value):
     return value
 
 
+# 명령 앞뒤에서 동일한 옵션을 사용할 수 있도록 공통 옵션을 등록한다.
 def add_options(parser, suppress=False):
+    # 하위 명령에서 생략한 옵션이 상위 명령의 입력값을 덮어쓰지 않게 한다.
     def default(value):
         return argparse.SUPPRESS if suppress else value
     parser.add_argument("--model", "-model", default=default(os.getenv("LLM_MODEL") or os.getenv("AI_MODEL") or "gpt-4.1-mini"), help="AI 모델 (LLM_MODEL / AI_MODEL 또는 gpt-4.1-mini)")
@@ -34,6 +38,7 @@ def add_options(parser, suppress=False):
     parser.add_argument("--safe-mode", "-safe-mode", action="store_true", default=default(False), help="민감정보 마스킹 및 diff 최대 10개 파일/200줄")
 
 
+# commit/pr 명령을 구분하고 도움말과 옵션 파서를 구성한다.
 def create_parser():
     parser = argparse.ArgumentParser(description="Git 변경 사항에서 커밋 메시지와 PR 초안을 생성합니다.")
     add_options(parser)
@@ -43,12 +48,14 @@ def create_parser():
     return parser
 
 
+# Git 수집 → 프롬프트 구성 → API 요청 → 검증 → 출력 순서로 실행한다.
 def main():
     args = create_parser().parse_args()
     calls = 0
     try:
         ensure_repository_root()
         status = get_git_status()
+        # 변경이 없으면 키를 확인하거나 API 비용을 발생시키지 않고 종료한다.
         if not status.strip():
             print("[INFO] 변경 사항이 없습니다. 커밋/PR 문구를 생성하지 않고 종료합니다.")
             return 0
@@ -60,6 +67,7 @@ def main():
         if not diff.strip():
             print("[INFO] 분석 가능한 텍스트 diff가 없습니다. 새 파일은 git add <파일> 후 다시 실행하세요.")
             return 0
+        # LLM_* 설정을 우선 사용하고, 없으면 기존 AI_* 설정으로 대체한다.
         api_key = (os.getenv("LLM_API_KEY") or os.getenv("AI_API_KEY") or "").strip()
         if not api_key:
             raise RuntimeError('LLM_API_KEY 또는 AI_API_KEY 환경변수가 설정되지 않았습니다. export LLM_API_KEY="YOUR_KEY"')
@@ -67,6 +75,7 @@ def main():
             raise RuntimeError("모델명을 지정하세요: --model 또는 AI_MODEL")
         print(f"[INFO] Git diff 수집 완료: {len(diff.splitlines())}줄")
         branch = get_current_branch() if args.command == "pr" else ""
+        # API에 전달할 diff뿐 아니라 파일 목록과 브랜치 이름도 마스킹한다.
         if args.safe_mode:
             diff = sanitize_diff(diff)
             status = mask_sensitive_data(status)
@@ -79,7 +88,9 @@ def main():
             print(f"[INFO] 현재 브랜치: {branch}")
             prompt = build_pr_prompt(branch, status, diff)
             validate = validate_pr
+        # 최초 입력을 보존해 재생성 시 형식 오류 설명만 추가한다.
         original_prompt = prompt
+        # 최초 생성 1회와 형식 재생성 1회로 호출 횟수를 제한한다.
         for attempt in range(2):
             calls += 1
             print(f"[INFO] AI API 요청 중... ({calls}/2)")
@@ -102,6 +113,7 @@ def main():
     except RuntimeError as error:
         print(f"[ERROR] {error}", file=sys.stderr)
         return 1
+    # 정상 종료와 오류 종료 모두에서 호출 시도 횟수를 표시한다.
     finally:
         print(f"[INFO] AI API 호출 횟수: {calls}")
 

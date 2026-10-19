@@ -15,8 +15,10 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+# 환경변수로 연결 설정을 읽고 HTTPS 요청을 보낸 뒤 생성된 텍스트를 반환한다.
 def call_ai(api_key, prompt, model, temperature, max_tokens):
     base = os.getenv("LLM_BASE_URL", "").strip()
+    # base URL에는 /v1까지 있으므로 채팅 API 경로를 뒤에 붙인다.
     url = base.rstrip("/") + "/chat/completions" if base else (os.getenv("AI_API_URL") or DEFAULT_API_URL)
     try:
         timeout = float(os.getenv("LLM_TIMEOUT_SECONDS", "30"))
@@ -24,6 +26,7 @@ def call_ai(api_key, prompt, model, temperature, max_tokens):
             raise ValueError
     except ValueError as error:
         raise RuntimeError("LLM_TIMEOUT_SECONDS는 양수여야 합니다.") from error
+    # 모델별 지원 차이를 확인하여 허용하지 않는 temperature 전송을 막는다.
     is_gpt5_mini = model == "gpt-5-mini" or model.startswith("gpt-5-mini-")
     if is_gpt5_mini and temperature is not None:
         raise RuntimeError("gpt-5-mini는 temperature를 지원하지 않습니다. --temperature 옵션을 빼세요.")
@@ -33,6 +36,7 @@ def call_ai(api_key, prompt, model, temperature, max_tokens):
     token_field = os.getenv("AI_TOKEN_PARAMETER", "max_completion_tokens")
     if token_field not in ("max_completion_tokens", "max_tokens"):
         raise RuntimeError("AI_TOKEN_PARAMETER는 max_completion_tokens 또는 max_tokens여야 합니다.")
+    # system은 작성 원칙을, user는 이번 변경 사항과 출력 양식을 전달한다.
     body = {
         "model": model, token_field: max_tokens,
         "messages": [
@@ -43,6 +47,7 @@ def call_ai(api_key, prompt, model, temperature, max_tokens):
     if not is_gpt5_mini:
         body["temperature"] = 0.3 if temperature is None else temperature
     try:
+        # Python 사전을 JSON 문자열과 UTF-8 바이트로 변환하여 POST 본문에 넣는다.
         request = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"),
                                          headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}, method="POST")
         opener = urllib.request.build_opener(NoRedirect)
@@ -62,7 +67,9 @@ def call_ai(api_key, prompt, model, temperature, max_tokens):
     except ValueError as error:
         raise RuntimeError("API 주소 또는 인증 헤더 설정이 잘못되었습니다.") from error
     try:
+        # Chat Completions 응답의 첫 번째 후보에서 생성 텍스트를 꺼낸다.
         choice = data["choices"][0]
+        # 토큰 한도로 잘린 응답을 완성된 초안으로 처리하지 않는다.
         if choice.get("finish_reason") == "length":
             raise RuntimeError("AI 출력이 토큰 한도로 잘렸습니다. --max-tokens를 늘려 실행하세요.")
         text = choice["message"]["content"]
