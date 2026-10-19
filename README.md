@@ -287,6 +287,70 @@ python3 -m unittest discover -s tests -v
 
 제출 전에는 유효한 API 키로 `commit`과 `pr`을 각각 실행하여 생성 결과를 확인하고, 소스와 README를 GitHub에 커밋·push해야 합니다. 이 프로그램은 해당 작업을 자동으로 수행하지 않습니다. 보너스인 실제 PR 작성, 팀 컨벤션 커스터마이징, 안전 모드 정책 고도화는 포함하지 않습니다.
 
+## 실제 실습 기록 (2026-10-19)
+
+아래는 직접 실행한 터미널 화면입니다. 위의 설명용 출력 예시와 구분하여, 이미지에서 확인되는 결과를 기록했습니다.
+
+| 이미지 | 실행 내용 | 확인 결과 |
+| --- | --- | --- |
+| 01.png | `pwd`, `ls` | 프로젝트 위치와 파일 목록 확인 |
+| 02.png | `python3 -m unittest discover -s tests -v` | 자동 테스트 16개 통과 (`OK`) |
+| 03.png | README 수정 후 `git diff -- README.md` | 실습 문구와 빈 줄 추가 확인 |
+| 04.png | `python3 main.py commit --safe-mode --max-tokens 4000` | 연결 오류로 생성 실패 |
+| 05.png | 인증서 설정 후 같은 `commit` 명령 재실행 | 커밋 메시지 생성 성공, API 1회 호출 |
+
+05.png의 출력 구분선은 `--- Commit Message ---`입니다. 본문의 'PR 초안'은 README에 추가한 문장을 인용한 것이며, 이 캡처가 PR 생성 결과라는 뜻은 아닙니다. PR 생성 성공 증빙은 `pr` 실행 명령과 `--- PR Title ---`, `--- PR Body ---`가 표시된 별도 화면으로 확인합니다.
+
+
+### 1. 프로젝트 위치와 파일 확인
+
+`pwd`와 `ls`로 `ai-git-helper` 폴더에서 실행 중이며, `main.py`와 각 모듈·테스트 폴더가 있는지 확인했습니다.
+
+![프로젝트 경로와 Python 파일 목록 확인](docs/images/01.png)
+
+### 2. 자동 테스트 16개 통과
+
+`python3 -m unittest discover -s tests -v` 실행 결과, **16개 테스트가 0.165초에 완료되어 OK**로 표시되었습니다. 이 테스트는 모의 API 응답과 임시 Git 저장소를 사용하므로 실제 API 연결 성공을 뜻하지는 않습니다.
+
+![자동 테스트 16개 통과 결과](docs/images/02.png)
+
+### 3. 분석할 README 변경 준비
+
+변경이 없는 상태에서 README 끝에 아래 실습 문구를 추가하고 `git diff -- README.md`로 확인했습니다. 화면에는 문구와 빈 줄이 추가된 diff가 표시됩니다.
+
+> 실습 기록: AI로 커밋 메시지와 PR 초안을 생성하고 결과를 검토합니다.
+
+![README 실습 문구 추가 및 Git diff 확인](docs/images/03.png)
+
+### 4. 첫 API 요청의 연결 오류
+
+`source .env` 후 커밋 생성 명령을 실행했습니다. README 변경 11줄을 수집하고 안전 모드를 적용했지만, 네트워크 오류 안내와 호출 횟수 1이 출력되었습니다. **이 화면은 생성 성공이 아닌 오류 처리 기록입니다.**
+
+![최초 API 요청에서 연결 오류가 출력된 화면](docs/images/04.png)
+
+### 5. 인증서 설정 후 실제 커밋 메시지 생성 성공
+
+현재 터미널에서 설치된 `certifi` 인증서 묶음을 사용하도록 지정한 후 다시 실행했습니다. 아래 인증서 설정은 이 실습 환경에서 적용한 방법이며 인증서 검증을 끄는 설정이 아닙니다.
+
+```bash
+source .env
+export SSL_CERT_FILE="$(python3 -m certifi)"
+python3 main.py commit --safe-mode --max-tokens 4000
+```
+
+화면에서 다음 결과를 확인했습니다.
+
+- 분석 대상: `README.md` 수정, diff 11줄.
+- 옵션: 안전 모드 활성화, 최대 출력 토큰 4000.
+- 결과: `[DONE] 검증된 초안 생성 완료` 출력.
+- 생성 제목: `README: 실습 기록 문구 추가`.
+- 본문: README 말미에 실습 문구와 빈 줄을 추가한 내용을 요약.
+- API 호출 횟수: 1회로 완료, 형식 재생성 없음.
+
+![인증서 설정 후 실제 API로 커밋 메시지를 생성한 결과](docs/images/05.png)
+
+생성된 제목과 본문이 앞서 확인한 README 변경과 일치하는지 검토했습니다. 프로그램은 초안 텍스트를 출력했으며 실제 Git 커밋을 생성하지 않았습니다. 현재 첨부된 이미지에는 PR 초안 생성 성공 화면이 없으므로, PR 실행의 이미지 증빙은 이 기록에 포함하지 않았습니다.
+
 ## 10. 파일별 역할
 
 - `main.py`: CLI 옵션, 실행 순서, 재생성 제한, 결과 출력
@@ -326,3 +390,5 @@ export AI_TOKEN_PARAMETER="max_tokens"
 
 <!-- 구현 참고: [Chat Completions 공식 API 규격](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create), [GPT-4.1 mini 모델 문서](https://developers.openai.com/api/docs/models/gpt-4.1-mini). -->
 
+
+실습 기록: AI로 커밋 메시지와 PR 초안을 생성하고 결과를 검토합니다.
