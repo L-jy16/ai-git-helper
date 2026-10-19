@@ -63,6 +63,7 @@ def main():
         print(mask_sensitive_data(status) if args.safe_mode else status, end="" if status.endswith('\n') else '\n')
         if any(line.startswith("??") for line in status.splitlines()):
             print("[WARN] 미추적 파일의 내용은 diff에 포함되지 않습니다. 포함하려면 git add <파일> 후 실행하세요.")
+            print('[INFO] 예: git add -- "새 파일.py" (실제 포함할 파일명으로 바꾸세요)')
         diff = get_git_diff()
         if not diff.strip():
             print("[INFO] 분석 가능한 텍스트 diff가 없습니다. 새 파일은 git add <파일> 후 다시 실행하세요.")
@@ -70,7 +71,7 @@ def main():
         # LLM_* 설정을 우선 사용하고, 없으면 기존 AI_* 설정으로 대체한다.
         api_key = (os.getenv("LLM_API_KEY") or os.getenv("AI_API_KEY") or "").strip()
         if not api_key:
-            raise RuntimeError('LLM_API_KEY 또는 AI_API_KEY 환경변수가 설정되지 않았습니다. export LLM_API_KEY="YOUR_KEY"')
+            raise RuntimeError('LLM_API_KEY 또는 AI_API_KEY 환경변수가 설정되지 않았습니다. export LLM_API_KEY="YOUR_KEY"\n[INFO] README.md의 2. Codyssey 환경변수 설정을 확인하세요.')
         if not args.model.strip():
             raise RuntimeError("모델명을 지정하세요: --model 또는 AI_MODEL")
         print(f"[INFO] Git diff 수집 완료: {len(diff.splitlines())}줄")
@@ -99,6 +100,9 @@ def main():
             if not errors:
                 break
             if attempt == 1:
+                if args.command == "pr":
+                    print("[INFO] PR 형식 예시는 README.md의 7. 오류가 나왔을 때를 참고하세요.")
+                    print("--- PR Title ---\n한 줄 제목\n--- PR Body ---\n## Why\n- 변경 배경\n## What\n- 핵심 변경\n## How to Test\n- 테스트 절차")
                 raise RuntimeError("재생성 후에도 형식 검증 실패: " + "; ".join(errors))
             print("[WARN] 형식 검증 실패, 한 번 재생성합니다: " + "; ".join(errors))
             prompt = original_prompt + "\n\n[이전 응답의 형식 오류: 반드시 수정]\n" + "\n".join(errors)
@@ -109,6 +113,8 @@ def main():
             print("\n--- Commit Message ---")
         print(result)
         print("----------------------")
+        label = "커밋 메시지" if args.command == "commit" else "PR 제목과 본문"
+        print(f"[INFO] 위 {label}는 초안입니다. 검토 후 구분선 안의 내용만 복사해서 사용하세요.")
         return 0
     except RuntimeError as error:
         print(f"[ERROR] {error}", file=sys.stderr)
